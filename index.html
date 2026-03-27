@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turkish Suffix Chain Builder</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  background:#f5f3ee;color:#333;min-height:100vh;
+  display:flex;justify-content:center;padding:24px 20px;
+}
+#app{max-width:1060px;width:100%;display:flex;gap:24px}
+#main{flex:1;max-width:720px}
+#sidebar{
+  width:240px;flex-shrink:0;
+  background:#fff;border-radius:12px;border:1.5px solid #e8e6e0;
+  padding:16px;display:flex;flex-direction:column;
+  position:sticky;top:24px;align-self:flex-start;
+  max-height:calc(100vh - 48px);overflow-y:auto;
+}
+#sidebar-title{
+  font-size:13px;font-weight:700;color:#999;text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:12px;
+}
+
+/* Sidebar items */
+.sidebar-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:8px;cursor:pointer;
+  transition:all .15s;margin-bottom:2px;
+}
+.sidebar-item:hover{background:#f5f3ee}
+.sidebar-item.active{background:#243251;color:#FAF8F2}
+.sidebar-item.active:hover{background:#2d3d5e}
+.sidebar-item.locked{opacity:.4;cursor:default;pointer-events:none}
+.sidebar-item.completed .si-root{color:#C8A84B}
+.sidebar-item.active.completed .si-root{color:#e0c060}
+.si-root{font-size:15px;font-weight:600;flex:1}
+.si-meaning{font-size:11px;color:#999;flex:1}
+.sidebar-item.active .si-meaning{color:#aab}
+.si-progress{font-size:11px;color:#aaa;white-space:nowrap}
+.sidebar-item.active .si-progress{color:#8899aa}
+.si-check{color:#C8A84B;font-weight:700;font-size:14px}
+#sidebar-footer{
+  margin-top:auto;padding-top:12px;border-top:1px solid #e8e6e0;
+  font-size:12px;color:#999;text-align:center;
+}
+
+/* Header */
+#header{text-align:center;margin-bottom:32px}
+#header-brand{
+  font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;
+  color:#C8A84B;margin-bottom:6px;
+}
+#header-title{
+  font-size:34px;font-weight:800;color:#243251;line-height:1.2;
+}
+#header-sub{
+  font-size:14px;color:#999;margin-top:6px;
+}
+
+/* Footer */
+#footer{
+  text-align:center;margin-top:40px;padding-top:20px;
+  border-top:1px solid #e8e6e0;font-size:13px;color:#aaa;
+}
+#footer a{color:#C8A84B;text-decoration:none;font-weight:600}
+#footer a:hover{text-decoration:underline}
+
+/* Meaning display */
+#meaning-display{text-align:center;margin-bottom:28px;min-height:68px}
+#meaning-word{font-size:28px;font-weight:500;color:#222;transition:opacity .15s}
+#meaning-gloss{font-size:15px;color:#888;margin-top:4px;transition:opacity .15s}
+#meaning-gloss.roast{font-style:italic;color:#c0392b}
+@keyframes meaning-pop{
+  0%{opacity:0;transform:translateY(6px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+.meaning-anim{animation:meaning-pop .25s ease-out both}
+
+/* Chain row */
+#chain{display:flex;align-items:center;margin-bottom:36px;min-height:52px;flex-wrap:wrap}
+.chain-block{
+  height:48px;display:flex;align-items:center;justify-content:center;
+  padding:0 18px;font-size:22px;font-weight:500;user-select:none;white-space:nowrap;
+}
+.root-block{
+  background:#243251;color:#FAF8F2;
+  border-radius:8px 0 0 8px;
+}
+.suffix-block{
+  background:#C8A84B18;color:#7a5d00;
+  border:1.5px solid #C8A84B;border-left:none;
+  cursor:pointer;transition:background .15s, transform .15s;
+}
+.suffix-block:first-of-type{border-left:1.5px solid #C8A84B}
+.suffix-block:hover{background:#C8A84B30;transform:translateY(-1px)}
+
+/* Suffix attach animation */
+@keyframes suffix-in{
+  0%{opacity:0;transform:translateY(12px) scaleX(0.7);max-width:0;padding:0}
+  40%{opacity:1;transform:translateY(-3px) scaleX(1.04);max-width:160px;padding:0 18px}
+  70%{transform:translateY(1px) scaleX(0.99)}
+  100%{transform:translateY(0) scaleX(1);max-width:160px;padding:0 18px}
+}
+.suffix-block.anim-in{
+  animation:suffix-in .35s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+/* Suffix detach animation */
+@keyframes suffix-out{
+  0%{opacity:1;transform:scaleX(1) scaleY(1);max-width:160px;padding:0 18px}
+  100%{opacity:0;transform:scaleX(0) scaleY(0.5);max-width:0;padding:0;border-width:0}
+}
+.suffix-block.anim-out{
+  animation:suffix-out .2s ease-in both;pointer-events:none;
+}
+
+/* Drop slot */
+.drop-slot{
+  border:2px dashed #d0d0d0;border-left:none;
+  border-radius:0 8px 8px 0;color:#ccc;
+  min-width:48px;font-size:20px;transition:all .2s;
+}
+.drop-slot.drag-over{border-color:#C8A84B;background:#C8A84B10;color:#C8A84B}
+.chain-only-root .drop-slot{border-left:2px dashed #d0d0d0}
+
+/* Word progress counter */
+#word-progress{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:28px;padding:0 4px;
+}
+#progress-bar-track{
+  flex:1;height:6px;background:#e8e6e0;border-radius:3px;overflow:hidden;
+}
+#progress-bar-fill{
+  height:100%;background:linear-gradient(90deg,#C8A84B,#e0c060);border-radius:3px;
+  transition:width .4s cubic-bezier(.4,0,.2,1);
+  width:0%;
+}
+#progress-text{
+  font-size:12px;color:#999;white-space:nowrap;min-width:120px;text-align:right;
+}
+#progress-text b{color:#7a5d00;font-weight:600}
+
+/* Suffix pool */
+#pool-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#pool-label{font-size:13px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+#suffix-pool{
+  display:flex;flex-wrap:wrap;gap:10px;padding:20px;
+  background:#fff;border-radius:12px;border:1.5px solid #e8e6e0;min-height:60px;
+}
+.pool-block{
+  display:flex;flex-direction:column;align-items:center;
+  padding:10px 16px 8px;border-radius:8px;border:1.5px solid #ddd;
+  cursor:grab;transition:all .25s cubic-bezier(.4,0,.2,1);user-select:none;
+  transform:scale(1);
+}
+.pool-block:active{cursor:grabbing;transform:scale(0.95)}
+.pool-block.disabled{opacity:.3;cursor:default;pointer-events:none;transform:scale(0.95)}
+
+/* Yapım eki (derivational) - warm amber */
+.pool-block.yapim{background:#fdf6e8;border-color:#ddc97a}
+.pool-block.yapim:hover{border-color:#C8A84B;background:#fdf0d0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.pool-block.yapim.disabled{background:#fdf6e8;border-color:#ddc97a}
+
+/* Çekim eki (inflectional) - cool blue */
+.pool-block.cekim{background:#eef3fb;border-color:#a3bde0}
+.pool-block.cekim:hover{border-color:#6a8ec4;background:#e0ebf7;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.pool-block.cekim.disabled{background:#eef3fb;border-color:#a3bde0}
+
+.pool-top{display:flex;align-items:baseline;gap:5px}
+.pool-resolved{font-size:18px;font-weight:500;color:#333}
+.pool-canonical{font-size:11px;color:#aaa}
+.pool-desc{font-size:11px;color:#999;margin-top:3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="main">
+    <div id="header">
+      <div id="header-brand">Turkish Academy</div>
+      <div id="header-title">Suffixation</div>
+      <div id="header-sub">Build real Turkish words by chaining suffixes</div>
+    </div>
+    <div id="meaning-display">
+      <div id="meaning-word"></div>
+      <div id="meaning-gloss"></div>
+    </div>
+    <div id="chain"></div>
+    <div id="word-progress">
+      <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
+      <div id="progress-text"><b>0</b> / 0 words discovered</div>
+    </div>
+    <div id="pool-header">
+      <div id="pool-label">Available suffixes</div>
+    </div>
+    <div id="suffix-pool"></div>
+    <div id="footer">A free game by <a href="https://www.turkish.academy" target="_blank">Turkish Academy</a></div>
+  </div>
+  <div id="sidebar">
+    <div id="sidebar-title">Words</div>
+    <div id="sidebar-list"></div>
+    <div id="sidebar-footer">
+      <div id="global-progress-text">0 / 140 total</div>
+    </div>
+  </div>
+</div>
+<script>
+// ── Data ──────────────────────────────────────────────
+const WORDS = {
+  'iş':    { meaning: 'work, job',         suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' }] },
+  'göz':   { meaning: 'eye',               suffixes: [{ template:'[CI]', desc:'watcher' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[DA]', desc:'favorite' }] },
+  'yol':   { meaning: 'road, way',         suffixes: [{ template:'[CI]', desc:'traveler' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' }] },
+  'baş':   { meaning: 'head, chief',       suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'kan', desc:'leader' },{ template:'[CA]', desc:'manner of' }] },
+  'ev':    { meaning: 'house, home',       suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' }] },
+  'su':    { meaning: 'water',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'güç':   { meaning: 'power, strength',   suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' }] },
+  'renk':  { meaning: 'color',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'ses':   { meaning: 'sound, voice',      suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
+  'vatan': { meaning: 'homeland',          suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' }] },
+  'söz':   { meaning: 'word, promise',     suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[DA]', desc:'so-called' },{ template:'[Al]', desc:'relating to' }] },
+  'can':   { meaning: 'life, soul',        suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' },{ template:'[DAş]', desc:'fellow' },{ template:'[DAn]', desc:'made of' }] },
+  'arka':  { meaning: 'back, behind',      suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
+  'kum':   { meaning: 'sand',              suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[sAl]', desc:'relating to' }] },
+  'çocuk': { meaning: 'child',             suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' }] },
+  'dil':   { meaning: 'language, tongue',  suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
+  'tuz':   { meaning: 'salt',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'süt':   { meaning: 'milk',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'çiçek': { meaning: 'flower',           suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'kitap': { meaning: 'book',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' }] },
+  'şeker': { meaning: 'sugar',            suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
+  'diş':   { meaning: 'tooth',            suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' }] },
+};
+
+// ── Compositional meaning engine ─────────────────────
+const MDATA = {
+  'iş': {
+    base: 'work',
+    ci: 'worker', siz: 'unemployed', lik: 'workshop',
+    ci_lik: 'workmanship', siz_lik: 'unemployment',
+  },
+  'göz': {
+    base: 'eye',
+    ci: 'lookout', siz: 'eyeless', lik: 'glasses', li: 'eyed', cik: 'small eye', da: 'favorite',
+    lik_ci: 'optician', lik_li: 'wearing glasses', lik_siz: 'without glasses',
+    siz_lik: 'blindness', ci_lik: 'lookout duty',
+    lik_ci_lik: "optician's trade", lik_siz_lik: 'lack of glasses',
+  },
+  'yol': {
+    base: 'road',
+    ci: 'traveler', siz: 'pathless', lik: 'travel allowance',
+    das: 'comrade',
+    ci_lik: 'journey', siz_lik: 'corruption', das_lik: 'comradeship',
+  },
+  'baş': {
+    base: 'head',
+    siz: 'leaderless', lik: 'heading', li: 'prominent',
+    kan: 'president',
+    kan_lik: 'presidency', siz_lik: 'lack of leadership',
+    lik_li: 'having a heading', lik_siz: 'without a heading',
+    li_ca: 'mainly, principally',
+  },
+  'ev': {
+    base: 'home',    ci: 'homebody', siz: 'homeless', lik: 'homestead', li: 'married', cik: 'little house',
+    ci_lik: 'domesticity', siz_lik: 'homelessness',
+    lik_ci: 'homestead keeper', lik_li: 'having a homestead', lik_siz: 'without a homestead',
+    li_lik: 'marriage',
+
+  },
+  'su': {
+    base: 'water',    ci: 'water seller', siz: 'waterless', lik: 'watering place', li: 'juicy',
+    ci_lik: 'water selling trade', siz_lik: 'drought',
+    lik_ci: 'watering place keeper', lik_li: 'having a watering place', lik_siz: 'without a watering place',
+    li_lik: 'juiciness',
+  },
+  'güç': {
+    base: 'power',
+    siz: 'powerless', lik: 'difficulty', li: 'powerful',
+    siz_lik: 'powerlessness',
+    lik_li: 'having difficulty', lik_siz: 'without difficulty',
+    li_lik: 'powerfulness',
+    li_ca: 'powerfully', siz_ca: 'powerlessly',
+  },
+  'renk': {
+    base: 'color',
+    ci: 'colorist', siz: 'colorless', lik: 'coloring', li: 'colorful',
+    ci_lik: 'colorist trade', siz_lik: 'lack of color',
+    lik_ci: 'coloring specialist', lik_li: 'having coloring', lik_siz: 'without coloring',
+    li_lik: 'colorfulness',
+  },
+  'ses': {
+    base: 'sound', das: 'homophone',
+    ci: 'vocalist', siz: 'silent', lik: 'sound system', li: 'voiced', cik: 'little sound',
+    ci_lik: 'vocal art', siz_lik: 'silence',
+    lik_ci: 'sound technician', lik_li: 'having a sound system', lik_siz: 'without a sound system',
+    li_lik: 'loudness',
+    siz_ca: 'silently',
+
+  },
+  'vatan': {
+    base: 'homeland',
+    ci: 'patriot', siz: 'stateless', lik: 'homeland duty', li: 'patriotic',
+    das: 'citizen',
+    ci_lik: 'patriotism', siz_lik: 'statelessness', das_lik: 'citizenship',
+    lik_ci: 'homeland officer', lik_li: 'having homeland duty', lik_siz: 'without homeland duty',
+    li_lik: 'patriotic spirit',
+
+  },
+  'söz': {
+    base: 'word',
+    ci: 'spokesperson', siz: 'speechless', lik: 'dictionary', li: 'verbal', cik: 'word',
+    ci_lik: 'spokesperson role', siz_lik: 'speechlessness',
+    lik_ci: 'lexicographer', lik_li: 'having a dictionary', lik_siz: 'without a dictionary',
+    li_lik: 'verbality', lik_ci_lik: 'lexicography',
+    da: 'so-called', al: 'verbal',
+  },
+  'can': {
+    base: 'life',
+    ci: 'life-lover', siz: 'lifeless', lik: 'vitality', li: 'alive', ca: 'wholeheartedly',
+    das: 'kindred spirit', dan: 'heartfelt',
+    ci_lik: 'zest for life', siz_lik: 'lifelessness', siz_ca: 'lifelessly',
+    lik_ci: 'vitality expert', lik_li: 'having vitality', lik_siz: 'without vitality',
+    li_lik: 'liveliness',
+  },
+  'arka': {
+    base: 'back',
+    li: 'backed, supported', lik: 'backrest', siz: 'without backing',
+    das: 'friend',
+    siz_lik: 'lack of backing',
+    das_lik: 'friendship', das_ca: 'in a friendly way', das_siz: 'friendless',
+    das_siz_lik: 'friendlessness',
+  },
+  'kum': {
+    base: 'sand',
+    ci: 'sand seller', siz: 'sandless', lik: 'sand pit', li: 'sandy', sal: 'beach',
+    ci_lik: 'sand trade', siz_lik: 'lack of sand',
+    lik_ci: 'sand pit worker', lik_li: 'having a sand pit', lik_siz: 'without a sand pit',
+    li_lik: 'sandiness',
+  },
+  'çocuk': {
+    base: 'child',
+    siz: 'childless', lik: 'childhood', li: 'having children', ca: 'childishly',
+    siz_lik: 'childlessness',
+    lik_li: 'having childhood', lik_siz: 'without childhood',
+    li_lik: 'parenthood',
+
+  },
+  'dil': {
+    base: 'language',
+    ci: 'linguist', siz: 'mute', lik: 'linguistics', li: 'spoken', das: 'sharing a language',
+    ci_lik: 'linguistics profession', siz_lik: 'muteness', das_lik: 'linguistic kinship',
+    lik_ci: 'linguistics scholar', lik_li: 'versed in linguistics', lik_siz: 'without linguistics',
+    siz_ca: 'mutely',
+    li_lik: 'eloquence',
+  },
+  'tuz': {
+    base: 'salt',
+    ci: 'salt seller', siz: 'saltless', lik: 'salt shaker', li: 'salty',
+    ci_lik: 'salt trade', siz_lik: 'lack of salt',
+  },
+  'süt': {
+    base: 'milk',
+    ci: 'milkman', siz: 'without milk', lik: 'dairy', li: 'milky',
+    ci_lik: 'dairy trade', siz_lik: 'lack of milk',
+  },
+  'çiçek': {
+    base: 'flower',
+    ci: 'florist', siz: 'flowerless', lik: 'flower bed', li: 'flowery',
+    ci_lik: 'floristry',
+  },
+  'kitap': {
+    base: 'book',
+    ci: 'bookseller', siz: 'bookless', lik: 'bookshelf', li: 'well-read', cik: 'booklet',
+    ci_lik: 'book trade', siz_lik: 'lack of books',
+  },
+  'şeker': {
+    base: 'sugar',
+    ci: 'confectioner', siz: 'sugarless', lik: 'sugar bowl', li: 'sweet',
+    ci_lik: 'confectionery',
+  },
+  'diş': {
+    base: 'tooth',
+    ci: 'dentist', siz: 'toothless', lik: 'gum guard', li: 'toothed', cik: 'small tooth',
+    ci_lik: 'dentistry', siz_lik: 'toothlessness',
+  },
+};
+
+// ── Compositional meaning builder ────────────────────
+function buildMeaning(root, templates) {
+  if (!templates.length) return WORDS[root].meaning;
+  const md = MDATA[root];
+  let en = md.base;
+  let adj = false, person = false, abstract = false;
+  let dk = '', firstD = true;
+
+  for (const t of templates) {
+    switch (t) {
+      case '[CI]': {
+        const k = dk ? dk + '_ci' : 'ci';
+        if (md[k]) { en = md[k]; }
+        else if (adj) {
+          en = en.startsWith('without ') ? 'one who is ' + en : en + ' person';
+        }
+        else if (abstract) { en = en + ' specialist'; }
+        else { en = en + ' worker'; }
+        adj = false; person = true; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[sIZ]': {
+        const k = dk ? dk + '_siz' : 'siz';
+        if (md[k]) { en = md[k]; }
+        else if (person) { en = 'without ' + en + 's'; }
+        else if (abstract) { en = 'without ' + en; }
+        else { en = 'without ' + en; }
+        adj = true; person = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[lIK]': {
+        const k = dk ? dk + '_lik' : 'lik';
+        if (md[k]) { en = md[k]; abstract = !firstD; }
+        else if (adj) {
+          if (en.startsWith('without ')) en = en.replace('without ', 'lack of ');
+          else if (en.startsWith('with ')) en = en.replace('with ', 'state of having ');
+          else en = 'state of being ' + en;
+          abstract = true;
+        }
+        else if (person) {
+          en = (en.endsWith("'s") ? en : en + "'s") + ' trade';
+          abstract = true;
+        }
+        else if (en.startsWith('at ') || en.startsWith('in ') || en.startsWith('on ') || en.startsWith('per ') || en.startsWith('so-called')) {
+          en = 'state of being ' + en; abstract = true;
+        }
+        else { en = en + '-ship'; abstract = true; }
+        adj = false; person = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[lI]': {
+        const k = dk ? dk + '_li' : 'li';
+        if (md[k]) { en = md[k]; }
+        else { en = 'with ' + en; }
+        adj = true; person = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[CA]': {
+        const k = dk ? dk + '_ca' : 'ca';
+        if (md[k]) { en = md[k]; }
+        else { en = 'in a ' + en + ' manner'; }
+        adj = true; person = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[DAş]': {
+        const k = dk ? dk + '_das' : 'das';
+        if (md[k]) { en = md[k]; }
+        else { en = 'fellow ' + en; }
+        person = true; adj = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[CIK]': {
+        const k = dk ? dk + '_cik' : 'cik';
+        if (md[k]) { en = md[k]; }
+        else { en = 'little ' + en; }
+        person = false; adj = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[msI]': {
+        const k = dk ? dk + '_msi' : 'msi';
+        if (md[k]) { en = md[k]; }
+        else { en = en + '-ish'; }
+        adj = true; person = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[sAl]': {
+        const k = dk ? dk + '_sal' : 'sal';
+        if (md[k]) { en = md[k]; }
+        else { en = en + '-related'; }
+        adj = true; person = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
+      case 'kan': {
+        en = md.kan || 'leader';
+        person = true; adj = false; abstract = false;
+        dk = 'kan'; firstD = false;
+        break;
+      }
+      case '[DA]': {
+        const dk2 = dk ? dk + '_da' : 'da';
+        if (md[dk2]) { en = md[dk2]; }
+        else if (firstD) { en = 'at ' + en; }
+        else if (abstract) { en = 'in ' + en; }
+        else if (person) { en = "at the " + en + "'s"; }
+        else { en = 'at the ' + en; }
+        adj = true; person = false; abstract = false;
+        dk = dk2; firstD = false;
+        break;
+      }
+      case '[DAn]': {
+        const dk3 = dk ? dk + '_dan' : 'dan';
+        if (md[dk3]) { en = md[dk3]; }
+        else { en = 'made of ' + en; }
+        adj = true; person = false; abstract = false;
+        dk = dk3; firstD = false;
+        break;
+      }
+      case '[Al]': {
+        const dk4 = dk ? dk + '_al' : 'al';
+        if (md[dk4]) { en = md[dk4]; }
+        else { en = en + '-related'; }
+        adj = true; person = false; abstract = false;
+        dk = dk4; firstD = false;
+        break;
+      }
+    }
+  }
+  return en;
+}
+
+// ── Root ordering (easiest to hardest) ───────────────
+const ROOT_ORDER = [
+  'renk',   // 4
+  'vatan',  // 4
+  'çocuk',  // 4
+  'iş',     // 5
+  'kum',    // 5
+  'süt',    // 5
+  'çiçek',  // 5
+  'şeker',  // 5
+  'ses',    // 6
+  'dil',    // 6
+  'tuz',    // 6
+  'kitap',  // 6
+  'güç',    // 7
+  'can',    // 7
+  'ev',     // 7
+  'su',     // 7
+  'diş',    // 7
+  'yol',    // 7
+  'baş',    // 8
+  'arka',   // 9
+  'söz',    // 12
+  'göz',    // 13 — Final boss
+];
+
+// ── State ─────────────────────────────────────────────
+let currentRoot = ROOT_ORDER[0];
+let chain = [];
+
+// ── Discovery tracking (persisted via localStorage) ──
+const STORAGE_KEY = 'suffixation_progress';
+const discovered = {};
+(function loadProgress() {
+  for (const root of Object.keys(WORDS)) discovered[root] = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved) {
+      for (const [root, words] of Object.entries(saved)) {
+        if (discovered[root]) words.forEach(w => discovered[root].add(w));
+      }
+    }
+  } catch (e) {}
+})();
+
+function saveProgress() {
+  const data = {};
+  for (const [root, set] of Object.entries(discovered)) {
+    if (set.size > 0) data[root] = [...set];
+  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+function isUnlocked(rootIdx) {
+  if (rootIdx === 0) return true; // first is always unlocked
+  const prevRoot = ROOT_ORDER[rootIdx - 1];
+  const total = VC[prevRoot].length;
+  const needed = Math.floor(total / 2) + 1; // more than half
+  return discovered[prevRoot].size >= needed;
+}
+
+function trackDiscovery() {
+  if (chain.length === 0) return;
+  const templates = chain.map(i => WORDS[currentRoot].suffixes[i].template);
+  // Check if this exact chain is a complete valid word (not just a prefix)
+  const isComplete = VC[currentRoot].some(valid =>
+    valid.length === templates.length && valid.every((t, i) => t === templates[i])
+  );
+  if (isComplete) {
+    const key = templates.join('+');
+    const isNew = !discovered[currentRoot].has(key);
+    discovered[currentRoot].add(key);
+    if (isNew) saveProgress();
+  }
+}
+
+function renderProgress() {
+  const total = VC[currentRoot].length;
+  const found = discovered[currentRoot].size;
+  const pct = total > 0 ? (found / total * 100) : 0;
+  document.getElementById('progress-bar-fill').style.width = pct + '%';
+  document.getElementById('progress-text').innerHTML =
+    '<b>' + found + '</b> / ' + total + ' words discovered';
+}
+
+// ── Audio ─────────────────────────────────────────────
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playAttach() {
+  ensureAudio();
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(400, t);
+  o.frequency.exponentialRampToValueAtTime(1600, t + 0.08);
+  g.gain.setValueAtTime(0.25, t);
+  g.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + 0.12);
+}
+function playDetach() {
+  ensureAudio();
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(1600, t);
+  o.frequency.exponentialRampToValueAtTime(400, t + 0.08);
+  g.gain.setValueAtTime(0.25, t);
+  g.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + 0.12);
+}
+
+// ── Vowel harmony ─────────────────────────────────────
+const BACK = new Set(['a','ı','o','u']);
+const FRONT = new Set(['e','i','ö','ü']);
+const VOICELESS = new Set(['ç','f','h','k','p','s','ş','t']);
+
+function lastVowel(word) {
+  for (let i = word.length - 1; i >= 0; i--) {
+    const c = word[i];
+    if (BACK.has(c) || FRONT.has(c)) return c;
+  }
+  return 'a';
+}
+function isVoicelessFinal(word) { return VOICELESS.has(word[word.length - 1]); }
+function fourWay(v) {
+  if (v === 'a' || v === 'ı') return 'ı';
+  if (v === 'o' || v === 'u') return 'u';
+  if (v === 'e' || v === 'i') return 'i';
+  return 'ü';
+}
+function twoWay(v) { return BACK.has(v) ? 'a' : 'e'; }
+
+function resolve(template, currentWord) {
+  if (!template.startsWith('[')) return template;
+  const lv = lastVowel(currentWord);
+  const vl = isVoicelessFinal(currentWord);
+  switch (template) {
+    case '[lIK]': return 'l' + fourWay(lv) + 'k';
+    case '[sIZ]': return 's' + fourWay(lv) + 'z';
+    case '[CI]':  return (vl ? 'ç' : 'c') + fourWay(lv);
+    case '[lI]':  return 'l' + fourWay(lv);
+    case '[CA]':  return (vl ? 'ç' : 'c') + twoWay(lv);
+    case '[DAş]': return (vl ? 't' : 'd') + twoWay(lv) + 'ş';
+    case '[CIK]': return (vl ? 'ç' : 'c') + fourWay(lv) + 'k';
+    case '[msI]': return 'ms' + fourWay(lv);
+    case '[sAl]': return 's' + twoWay(lv) + 'l';
+    case '[DA]':  return (vl ? 't' : 'd') + twoWay(lv);
+    case '[DAn]': return (vl ? 't' : 'd') + twoWay(lv) + 'n';
+    case '[Al]':  return twoWay(lv) + 'l';
+    default: return template;
+  }
+}
+
+// ── Suffix grammar ───────────────────────────────────
+const YAPIM = new Set(['[CI]','[sIZ]','[lIK]','[lI]','[CA]','[DAş]','[CIK]','[msI]','[sAl]','kan','[DA]','[DAn]','[Al]']);
+
+// ── Per-root valid chains (whitelist of real Turkish words) ──
+const VC = {
+  'iş': [
+    ['[CI]'],                              // işçi
+    ['[CI]','[lIK]'],                      // işçilik
+    ['[sIZ]'],                             // işsiz
+    ['[sIZ]','[lIK]'],                     // işsizlik
+    ['[lIK]'],                             // işlik
+  ],
+  'göz': [
+    ['[CI]'],                              // gözcü
+    ['[CI]','[lIK]'],                      // gözcülük
+    ['[sIZ]'],                             // gözsüz
+    ['[sIZ]','[lIK]'],                     // gözsüzlük
+    ['[lIK]'],                             // gözlük
+    ['[lIK]','[CI]'],                      // gözlükçü
+    ['[lIK]','[CI]','[lIK]'],              // gözlükçülük
+    ['[lIK]','[lI]'],                      // gözlüklü
+    ['[lIK]','[sIZ]'],                     // gözlüksüz
+    ['[lIK]','[sIZ]','[lIK]'],             // gözlüksüzlük
+    ['[lI]'],                              // gözlü
+    ['[CIK]'],                             // gözcük
+    ['[DA]'],                              // gözde (favorite)
+  ],
+  'yol': [
+    ['[CI]'],                              // yolcu
+    ['[CI]','[lIK]'],                      // yolculuk
+    ['[sIZ]'],                             // yolsuz
+    ['[sIZ]','[lIK]'],                     // yolsuzluk
+    ['[lIK]'],                             // yolluk
+    ['[DAş]'],                             // yoldaş
+    ['[DAş]','[lIK]'],                     // yoldaşlık
+  ],
+  'baş': [
+    ['[sIZ]'],                             // başsız
+    ['[sIZ]','[lIK]'],                     // başsızlık
+    ['[lIK]'],                             // başlık
+    ['[lIK]','[lI]'],                      // başlıklı
+    ['[lIK]','[sIZ]'],                     // başlıksız
+    ['[lI]'],                              // başlı
+    ['[lI]','[CA]'],                       // başlıca (mainly, principal)
+    ['kan'],                               // başkan
+    ['kan','[lIK]'],                       // başkanlık
+  ],
+  'ev': [
+    ['[CI]'],                              // evci
+    ['[CI]','[lIK]'],                      // evcilik
+    ['[sIZ]'],                             // evsiz
+    ['[sIZ]','[lIK]'],                     // evsizlik
+    ['[lI]'],                              // evli
+    ['[lI]','[lIK]'],                      // evlilik
+    ['[CIK]'],                             // evcik
+  ],
+  'su': [
+    ['[CI]'],                              // sucu
+    ['[CI]','[lIK]'],                      // suculuk
+    ['[sIZ]'],                             // susuz
+    ['[sIZ]','[lIK]'],                     // susuzluk
+    ['[lIK]'],                             // suluk
+    ['[lI]'],                              // sulu
+    ['[lI]','[lIK]'],                      // sululuk
+  ],
+  'güç': [
+    ['[lI]'],                              // güçlü
+    ['[lI]','[lIK]'],                      // güçlülük
+    ['[lI]','[CA]'],                       // güçlüce (powerfully)
+    ['[sIZ]'],                             // güçsüz
+    ['[sIZ]','[lIK]'],                     // güçsüzlük
+    ['[sIZ]','[CA]'],                      // güçsüzce (powerlessly)
+    ['[lIK]'],                             // güçlük
+  ],
+  'renk': [
+    ['[lI]'],                              // renkli
+    ['[lI]','[lIK]'],                      // renklilik
+    ['[sIZ]'],                             // renksiz
+    ['[sIZ]','[lIK]'],                     // renksizlik
+  ],
+  'ses': [
+    ['[lI]'],                              // sesli
+    ['[lI]','[lIK]'],                      // seslilik
+    ['[sIZ]'],                             // sessiz
+    ['[sIZ]','[lIK]'],                     // sessizlik
+    ['[sIZ]','[CA]'],                      // sessizce (silently)
+    ['[DAş]'],                             // sesteş (homophone)
+  ],
+  'vatan': [
+    ['[DAş]'],                             // vatandaş
+    ['[DAş]','[lIK]'],                     // vatandaşlık
+    ['[sIZ]'],                             // vatansız
+    ['[sIZ]','[lIK]'],                     // vatansızlık
+  ],
+  'söz': [
+    ['[CI]'],                              // sözcü
+    ['[CI]','[lIK]'],                      // sözcülük
+    ['[lIK]'],                             // sözlük
+    ['[lIK]','[CI]'],                      // sözlükçü
+    ['[lIK]','[CI]','[lIK]'],              // sözlükçülük
+    ['[lI]'],                              // sözlü
+    ['[lI]','[lIK]'],                      // sözlülük
+    ['[sIZ]'],                             // sözsüz
+    ['[sIZ]','[lIK]'],                     // sözsüzlük
+    ['[CIK]'],                             // sözcük
+    ['[DA]'],                              // sözde (so-called)
+    ['[Al]'],                              // sözel (verbal)
+  ],
+  'can': [
+    ['[lI]'],                              // canlı
+    ['[lI]','[lIK]'],                      // canlılık
+    ['[sIZ]'],                             // cansız
+    ['[sIZ]','[lIK]'],                     // cansızlık
+    ['[DAş]'],                             // candaş (kindred spirit)
+    ['[DAn]'],                             // candan (heartfelt)
+  ],
+  'arka': [
+    ['[lI]'],                              // arkalı
+    ['[lIK]'],                             // arkalık (backrest)
+    ['[sIZ]'],                             // arkasız
+    ['[sIZ]','[lIK]'],                     // arkasızlık
+    ['[DAş]'],                             // arkadaş (friend!)
+    ['[DAş]','[lIK]'],                     // arkadaşlık (friendship)
+    ['[DAş]','[CA]'],                      // arkadaşça (in a friendly way)
+    ['[DAş]','[sIZ]'],                     // arkadaşsız (friendless)
+    ['[DAş]','[sIZ]','[lIK]'],             // arkadaşsızlık (friendlessness)
+  ],
+  'kum': [
+    ['[CI]'],                              // kumcu
+    ['[CI]','[lIK]'],                      // kumculuk
+    ['[lI]'],                              // kumlu
+    ['[lIK]'],                             // kumluk
+    ['[sAl]'],                             // kumsal
+  ],
+  'çocuk': [
+    ['[lIK]'],                             // çocukluk
+    ['[CA]'],                              // çocukça
+    ['[sIZ]'],                             // çocuksuz
+    ['[sIZ]','[lIK]'],                     // çocuksuzluk
+  ],
+  'dil': [
+    ['[CI]'],                              // dilci
+    ['[CI]','[lIK]'],                      // dilcilik
+    ['[sIZ]'],                             // dilsiz
+    ['[sIZ]','[lIK]'],                     // dilsizlik
+    ['[DAş]'],                             // dildaş
+  ],
+  'tuz': [
+    ['[CI]'],                              // tuzcu
+    ['[CI]','[lIK]'],                      // tuzculuk
+    ['[lI]'],                              // tuzlu
+    ['[sIZ]'],                             // tuzsuz
+    ['[sIZ]','[lIK]'],                     // tuzsuzluk
+    ['[lIK]'],                             // tuzluk
+  ],
+  'süt': [
+    ['[CI]'],                              // sütçü
+    ['[CI]','[lIK]'],                      // sütçülük
+    ['[lI]'],                              // sütlü
+    ['[sIZ]'],                             // sütsüz
+    ['[sIZ]','[lIK]'],                     // sütsüzlük
+  ],
+  'çiçek': [
+    ['[CI]'],                              // çiçekçi
+    ['[CI]','[lIK]'],                      // çiçekçilik
+    ['[lI]'],                              // çiçekli
+    ['[sIZ]'],                             // çiçeksiz
+    ['[lIK]'],                             // çiçeklik
+  ],
+  'kitap': [
+    ['[CI]'],                              // kitapçı
+    ['[CI]','[lIK]'],                      // kitapçılık
+    ['[lIK]'],                             // kitaplık
+    ['[sIZ]'],                             // kitapsız
+    ['[sIZ]','[lIK]'],                     // kitapsızlık
+    ['[CIK]'],                             // kitapçık (booklet)
+  ],
+  'şeker': [
+    ['[CI]'],                              // şekerci
+    ['[CI]','[lIK]'],                      // şekercilik
+    ['[lI]'],                              // şekerli
+    ['[sIZ]'],                             // şekersiz
+    ['[lIK]'],                             // şekerlik
+  ],
+  'diş': [
+    ['[CI]'],                              // dişçi
+    ['[CI]','[lIK]'],                      // dişçilik
+    ['[lI]'],                              // dişli
+    ['[sIZ]'],                             // dişsiz
+    ['[sIZ]','[lIK]'],                     // dişsizlik
+    ['[lIK]'],                             // dişlik (gum guard)
+    ['[CIK]'],                             // dişçik (small tooth)
+  ],
+};
+
+function isValidPrefix(root, chainTemplates, candidate) {
+  const test = [...chainTemplates, candidate];
+  return VC[root].some(valid => {
+    if (test.length > valid.length) return false;
+    return test.every((t, i) => t === valid[i]);
+  });
+}
+
+function isValidNext(template) {
+  const cur = chain.map(i => WORDS[currentRoot].suffixes[i].template);
+  return isValidPrefix(currentRoot, cur, template);
+}
+
+// ── Helpers ───────────────────────────────────────────
+function getAssembled() {
+  let word = currentRoot;
+  const parts = [currentRoot];
+  for (const idx of chain) {
+    const r = resolve(WORDS[currentRoot].suffixes[idx].template, word);
+    word += r;
+    parts.push(r);
+  }
+  return { word, key: parts.join('+') };
+}
+
+function el(tag, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+
+// ── Render ────────────────────────────────────────────
+function render() {
+  trackDiscovery();
+  renderSidebar();
+  renderMeaning();
+  renderChain();
+  renderProgress();
+  renderPool();
+}
+
+function renderSidebar() {
+  const cont = document.getElementById('sidebar-list');
+  cont.innerHTML = '';
+  let globalFound = 0;
+  let globalTotal = 0;
+
+  ROOT_ORDER.forEach((root, idx) => {
+    const total = VC[root].length;
+    const found = discovered[root].size;
+    globalFound += found;
+    globalTotal += total;
+    const done = found >= total;
+    const unlocked = isUnlocked(idx);
+    const active = root === currentRoot;
+
+    let cls = 'sidebar-item';
+    if (active) cls += ' active';
+    if (!unlocked) cls += ' locked';
+    if (done) cls += ' completed';
+
+    const item = el('div', cls);
+
+    const rootSpan = el('span', 'si-root');
+    rootSpan.textContent = root;
+    item.appendChild(rootSpan);
+
+    const meaningSpan = el('span', 'si-meaning');
+    meaningSpan.textContent = WORDS[root].meaning;
+    item.appendChild(meaningSpan);
+
+    const progressSpan = el('span', 'si-progress');
+    if (done) {
+      progressSpan.innerHTML = '<span class="si-check">\u2713</span>';
+    } else if (unlocked) {
+      progressSpan.textContent = found + '/' + total;
+    } else {
+      progressSpan.textContent = '\uD83D\uDD12';
+    }
+    item.appendChild(progressSpan);
+
+    if (unlocked && !active) {
+      item.addEventListener('click', () => {
+        currentRoot = root;
+        chain = [];
+        render();
+      });
+    }
+
+    cont.appendChild(item);
+  });
+
+  document.getElementById('global-progress-text').innerHTML =
+    '<b>' + globalFound + '</b> / ' + globalTotal + ' total words';
+}
+
+const ROASTS = [
+  "The TDK just called \u2014 they're concerned.",
+  "Not a word\u2026 yet. Start a petition?",
+  "A Turkish teacher somewhere just flinched.",
+  "Bold move. Incorrect, but bold.",
+  "Turkish grammar lawyers are preparing a cease and desist.",
+  "Congratulations, you've confused both Turkish and English.",
+  "This suffix combo has been banned in 81 provinces.",
+  "This is the linguistic equivalent of socks with sandals.",
+  "Somewhere, a linguistics professor felt a disturbance.",
+  "You've invented a new word! (It means nothing.)",
+  "Turkish has 150,000+ words. This isn't one of them.",
+  "Points for creativity. Zero for grammar.",
+  "Even the word 'zamazingo' has more meaning than this.",
+];
+let _lastRoast = -1;
+function getRoast() {
+  let i;
+  do { i = Math.floor(Math.random() * ROASTS.length); } while (i === _lastRoast && ROASTS.length > 1);
+  _lastRoast = i;
+  return ROASTS[i];
+}
+
+function isCompleteWord(root, templates) {
+  return VC[root].some(valid =>
+    valid.length === templates.length && valid.every((t, i) => t === templates[i])
+  );
+}
+
+let _lastMeaningWord = '';
+function renderMeaning() {
+  const { word } = getAssembled();
+  const templates = chain.map(i => WORDS[currentRoot].suffixes[i].template);
+  const wEl = document.getElementById('meaning-word');
+  const gEl = document.getElementById('meaning-gloss');
+  if (word !== _lastMeaningWord) {
+    _lastMeaningWord = word;
+    wEl.textContent = word;
+    if (chain.length === 0) {
+      gEl.textContent = buildMeaning(currentRoot, templates);
+      gEl.className = '';
+    } else if (isCompleteWord(currentRoot, templates)) {
+      gEl.textContent = buildMeaning(currentRoot, templates);
+      gEl.className = '';
+    } else {
+      // Special roasts for specific patterns
+      const likCount = templates.filter(t => t === '[lIK]').length;
+      if (likCount >= 2) {
+        gEl.textContent = "Stop lik'ing around!";
+      } else {
+        gEl.textContent = getRoast();
+      }
+      gEl.className = 'roast';
+    }
+    wEl.classList.remove('meaning-anim');
+    gEl.classList.remove('meaning-anim');
+    void wEl.offsetWidth;
+    wEl.classList.add('meaning-anim');
+    gEl.classList.add('meaning-anim');
+  }
+}
+
+let _prevChainLen = 0;
+let _animAction = 'none'; // 'attach' | 'detach' | 'none'
+
+function renderChain() {
+  const cont = document.getElementById('chain');
+  cont.innerHTML = '';
+  cont.className = chain.length === 0 ? 'chain-only-root' : '';
+
+  const rootEl = el('div', 'chain-block root-block');
+  rootEl.textContent = currentRoot;
+  cont.appendChild(rootEl);
+
+  let currentWord = currentRoot;
+  chain.forEach((suffIdx, i) => {
+    const suffix = WORDS[currentRoot].suffixes[suffIdx];
+    const resolved = resolve(suffix.template, currentWord);
+    currentWord += resolved;
+
+    const isNew = (_animAction === 'attach' && i === chain.length - 1);
+    const blk = el('div', 'chain-block suffix-block' + (isNew ? ' anim-in' : ''));
+    blk.textContent = resolved;
+    blk.draggable = true;
+    blk.addEventListener('click', () => {
+      // Animate out all blocks from this position onward
+      _animAction = 'detach';
+      const blocks = cont.querySelectorAll('.suffix-block');
+      let animated = 0;
+      const toRemove = Array.from(blocks).slice(i);
+      toRemove.forEach(b => {
+        b.classList.add('anim-out');
+        animated++;
+      });
+      setTimeout(() => {
+        chain.splice(i);
+        playDetach();
+        render();
+      }, 180);
+    });
+    blk.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', 'remove:' + i);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    cont.appendChild(blk);
+  });
+
+  _prevChainLen = chain.length;
+  _animAction = 'none';
+
+  const slot = el('div', 'chain-block drop-slot');
+  slot.textContent = '+';
+  slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+  slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+  slot.addEventListener('drop', e => {
+    e.preventDefault();
+    slot.classList.remove('drag-over');
+    const d = e.dataTransfer.getData('text/plain');
+    if (d.startsWith('attach:')) {
+      const idx = parseInt(d.split(':')[1]);
+      _animAction = 'attach';
+      chain.push(idx); playAttach(); render();
+    }
+  });
+  cont.appendChild(slot);
+}
+
+function renderPool() {
+  const cont = document.getElementById('suffix-pool');
+  cont.innerHTML = '';
+  const { word: currentWord } = getAssembled();
+  const wordData = WORDS[currentRoot];
+
+  wordData.suffixes.forEach((suffix, idx) => {
+    const inChain = chain.includes(idx);
+    const likCount = chain.filter(j => WORDS[currentRoot].suffixes[j].template === '[lIK]').length;
+    const canRepeat = suffix.template === '[lIK]' && likCount < 2;
+    const alreadyUsed = inChain && !canRepeat;
+    const isYapim = YAPIM.has(suffix.template);
+
+    const blk = el('div', 'pool-block'
+      + (alreadyUsed ? ' disabled' : '')
+      + (isYapim ? ' yapim' : ' cekim'));
+
+    const top = el('div', 'pool-top');
+    const rSpan = el('span', 'pool-resolved');
+    rSpan.textContent = '-' + resolve(suffix.template, currentWord);
+    top.appendChild(rSpan);
+
+    if (suffix.template.startsWith('[') || suffix.template === 'kan') {
+      const cSpan = el('span', 'pool-canonical');
+      cSpan.textContent = suffix.template;
+      top.appendChild(cSpan);
+    }
+    blk.appendChild(top);
+
+    const dSpan = el('span', 'pool-desc');
+    dSpan.textContent = suffix.desc;
+    blk.appendChild(dSpan);
+
+    if (!alreadyUsed) {
+      blk.addEventListener('click', () => { _animAction = 'attach'; chain.push(idx); playAttach(); render(); });
+      blk.draggable = true;
+      blk.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', 'attach:' + idx);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+    }
+
+    cont.appendChild(blk);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────
+(function init() {
+  const pool = document.getElementById('suffix-pool');
+  pool.addEventListener('dragover', e => e.preventDefault());
+  pool.addEventListener('drop', e => {
+    e.preventDefault();
+    const d = e.dataTransfer.getData('text/plain');
+    if (d.startsWith('remove:')) {
+      const idx = parseInt(d.split(':')[1]);
+      _animAction = 'detach';
+      chain.splice(idx);
+      playDetach();
+      render();
+    }
+  });
+  render();
+})();
+</script>
+</body>
+</html>
