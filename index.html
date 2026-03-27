@@ -175,6 +175,80 @@ body{
 .pool-resolved{font-size:18px;font-weight:500;color:#333}
 .pool-canonical{font-size:11px;color:#aaa}
 .pool-desc{font-size:11px;color:#999;margin-top:3px}
+
+/* Tutorial hint */
+#tutorial-box {
+  display:none;
+  background:#f0f4ff;
+  border:1.5px solid #c5d5f5;
+  border-radius:12px;
+  padding:14px 18px;
+  margin-bottom:20px;
+  font-size:13px;
+  color:#445;
+  line-height:1.7;
+}
+#tutorial-box.visible { display:block; }
+.t-step { display:flex; align-items:flex-start; gap:10px; margin-bottom:4px; }
+.t-num {
+  background:#243251; color:#fff; border-radius:50%;
+  min-width:20px; height:20px; display:flex; align-items:center;
+  justify-content:center; font-size:11px; font-weight:700; margin-top:2px;
+}
+
+/* ── Mobile layout ───────────────────────────────────── */
+@media (max-width:680px) {
+  body { padding:12px; }
+  #app { flex-direction:column; gap:0; }
+
+  /* Word strip moves to top */
+  #sidebar {
+    order:-1;
+    width:100%; position:static; max-height:none;
+    border-radius:10px; padding:10px 12px; margin-bottom:14px;
+  }
+  #sidebar-title { display:none; }
+  #sidebar-footer { display:none; }
+  #sidebar-list {
+    display:flex; flex-direction:row;
+    overflow-x:auto; gap:6px;
+    padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  #sidebar-list::-webkit-scrollbar { display:none; }
+
+  /* Compact word pills */
+  .sidebar-item {
+    flex-direction:column; align-items:center;
+    padding:6px 10px; gap:2px; margin-bottom:0;
+    border:1.5px solid #e0ddd8; background:#faf8f2;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .sidebar-item:hover { background:#f0ede6; }
+  .sidebar-item.active { background:#243251; border-color:#243251; }
+  .sidebar-item.locked { opacity:.35; border-color:#e8e6e0; }
+  .si-meaning { display:none; }
+  .si-root { font-size:13px; }
+  .si-progress { font-size:10px; color:#bbb; }
+  .sidebar-item.active .si-progress { color:#8899aa; }
+
+  /* Main content scaling */
+  #main { max-width:100%; }
+  #header { margin-bottom:18px; }
+  #header-title { font-size:26px; }
+  #header-sub { font-size:12px; }
+  #meaning-display { margin-bottom:18px; min-height:52px; }
+  #meaning-word { font-size:22px; }
+  #meaning-gloss { font-size:13px; }
+  #chain { margin-bottom:24px; }
+  .chain-block { height:40px; font-size:17px; padding:0 13px; }
+  #word-progress { margin-bottom:20px; }
+  #progress-text { font-size:11px; min-width:100px; }
+  #suffix-pool { padding:14px; gap:8px; }
+  .pool-block { padding:8px 12px 6px; }
+  .pool-resolved { font-size:16px; }
+  .pool-desc { font-size:10px; }
+}
 </style>
 </head>
 <body>
@@ -190,6 +264,7 @@ body{
       <div id="meaning-gloss"></div>
     </div>
     <div id="chain"></div>
+    <div id="tutorial-box"></div>
     <div id="word-progress">
       <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
       <div id="progress-text"><b>0</b> / 0 words discovered</div>
@@ -219,18 +294,25 @@ const WORDS = {
   'su':    { meaning: 'water',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
   'güç':   { meaning: 'power, strength',   suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' }] },
   'renk':  { meaning: 'color',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
-  'ses':   { meaning: 'sound, voice',      suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
-  'vatan': { meaning: 'homeland',          suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' }] },
   'söz':   { meaning: 'word, promise',     suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[DA]', desc:'so-called' },{ template:'[Al]', desc:'relating to' }] },
   'can':   { meaning: 'life, soul',        suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' },{ template:'[DAş]', desc:'fellow' },{ template:'[DAn]', desc:'made of' }] },
   'arka':  { meaning: 'back, behind',      suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
   'kum':   { meaning: 'sand',              suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[sAl]', desc:'relating to' }] },
-  'çocuk': { meaning: 'child',             suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CA]', desc:'manner of' }] },
   'dil':   { meaning: 'language, tongue',  suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
   'tuz':   { meaning: 'salt',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
   'süt':   { meaning: 'milk',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
   'çiçek': { meaning: 'flower',           suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
-  'kitap': { meaning: 'book',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' }] },
+  'kitap': { meaning: 'book',             suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' },{ template:'[hane]', desc:'place of' }] },
+  'çay':   { meaning: 'tea',              suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[hane]', desc:'place of' }] },
+  'emek':  { meaning: 'labor, effort',   suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[lI]', desc:'having' },{ template:'[lIK]', desc:'forms noun' },{ template:'[DAr]', desc:'veteran' }] },
+  'zaman': { meaning: 'time',          suffixes: [{ template:'[lI]', desc:'having' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[sAl]', desc:'relating to' },{ template:'[DAş]', desc:'fellow' },{ template:'[CA]', desc:'manner of' }] },
+  'şehir': { meaning: 'city',          suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[lI]', desc:'having' },{ template:'[lIK]', desc:'forms noun' },{ template:'[sAl]', desc:'relating to' }] },
+  'ölçü':  { meaning: 'measure',       suffixes: [{ template:'[lI]', desc:'having' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[CA]', desc:'manner of' }] },
+  'din':   { meaning: 'religion',      suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[DAş]', desc:'fellow' },{ template:'[sAl]', desc:'relating to' }] },
+  'para':  { meaning: 'money',         suffixes: [{ template:'[sIZ]', desc:'without' },{ template:'[lI]', desc:'having' },{ template:'[lIK]', desc:'forms noun' },{ template:'[sAl]', desc:'relating to' },{ template:'[CIK]', desc:'diminutive' },{ template:'[CA]', desc:'manner of' }] },
+  'hak':   { meaning: 'right, justice',suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[lI]', desc:'having' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[CA]', desc:'manner of' }] },
+  'akıl':  { meaning: 'mind, reason',  suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[lI]', desc:'having' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[CA]', desc:'manner of' }] },
+  'hasta': { meaning: 'sick, patient',   suffixes: [{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[sIZ]', desc:'without' },{ template:'[hane]', desc:'place of' }] },
   'şeker': { meaning: 'sugar',            suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' }] },
   'diş':   { meaning: 'tooth',            suffixes: [{ template:'[CI]', desc:'doer of' },{ template:'[sIZ]', desc:'without' },{ template:'[lIK]', desc:'forms noun' },{ template:'[lI]', desc:'having' },{ template:'[CIK]', desc:'diminutive' }] },
 };
@@ -265,13 +347,13 @@ const MDATA = {
   },
   'ev': {
     base: 'home',    ci: 'homebody', siz: 'homeless', lik: 'homestead', li: 'married', cik: 'little house',
-    ci_lik: 'domesticity', siz_lik: 'homelessness',
+    ci_lik: 'play pretend', siz_lik: 'homelessness',
     lik_ci: 'homestead keeper', lik_li: 'having a homestead', lik_siz: 'without a homestead',
     li_lik: 'marriage',
 
   },
   'su': {
-    base: 'water',    ci: 'water seller', siz: 'waterless', lik: 'watering place', li: 'juicy',
+    base: 'water',    ci: 'water seller', siz: 'waterless', lik: 'water container', li: 'juicy',
     ci_lik: 'water selling trade', siz_lik: 'drought',
     lik_ci: 'watering place keeper', lik_li: 'having a watering place', lik_siz: 'without a watering place',
     li_lik: 'juiciness',
@@ -290,24 +372,6 @@ const MDATA = {
     ci_lik: 'colorist trade', siz_lik: 'lack of color',
     lik_ci: 'coloring specialist', lik_li: 'having coloring', lik_siz: 'without coloring',
     li_lik: 'colorfulness',
-  },
-  'ses': {
-    base: 'sound', das: 'homophone',
-    ci: 'vocalist', siz: 'silent', lik: 'sound system', li: 'voiced', cik: 'little sound',
-    ci_lik: 'vocal art', siz_lik: 'silence',
-    lik_ci: 'sound technician', lik_li: 'having a sound system', lik_siz: 'without a sound system',
-    li_lik: 'loudness',
-    siz_ca: 'silently',
-
-  },
-  'vatan': {
-    base: 'homeland',
-    ci: 'patriot', siz: 'stateless', lik: 'homeland duty', li: 'patriotic',
-    das: 'citizen',
-    ci_lik: 'patriotism', siz_lik: 'statelessness', das_lik: 'citizenship',
-    lik_ci: 'homeland officer', lik_li: 'having homeland duty', lik_siz: 'without homeland duty',
-    li_lik: 'patriotic spirit',
-
   },
   'söz': {
     base: 'word',
@@ -340,14 +404,6 @@ const MDATA = {
     lik_ci: 'sand pit worker', lik_li: 'having a sand pit', lik_siz: 'without a sand pit',
     li_lik: 'sandiness',
   },
-  'çocuk': {
-    base: 'child',
-    siz: 'childless', lik: 'childhood', li: 'having children', ca: 'childishly',
-    siz_lik: 'childlessness',
-    lik_li: 'having childhood', lik_siz: 'without childhood',
-    li_lik: 'parenthood',
-
-  },
   'dil': {
     base: 'language',
     ci: 'linguist', siz: 'mute', lik: 'linguistics', li: 'spoken', das: 'sharing a language',
@@ -374,7 +430,60 @@ const MDATA = {
   'kitap': {
     base: 'book',
     ci: 'bookseller', siz: 'bookless', lik: 'bookshelf', li: 'well-read', cik: 'booklet',
+    hane: 'library',
     ci_lik: 'book trade', siz_lik: 'lack of books',
+  },
+  'çay': {
+    base: 'tea',
+    ci: 'tea vendor', siz: 'without tea', lik: 'tea garden', hane: 'teahouse',
+    ci_lik: 'tea vending trade',
+  },
+  'emek': {
+    base: 'labor',
+    ci: 'laborer', li: 'retired', lik: 'toil',
+    dar: 'veteran worker',
+    ci_lik: "laborer's trade", li_lik: 'retirement', dar_lik: 'veteran status',
+  },
+  'zaman': {
+    base: 'time',
+    li: 'timely', siz: 'untimely', sal: 'temporal', das: 'contemporary',
+    siz_lik: 'untimeliness', das_lik: 'contemporaneity', siz_ca: 'untimely',
+  },
+  'şehir': {
+    base: 'city',
+    ci: 'urban planner', li: 'city-dweller', sal: 'urban',
+    ci_lik: 'urban planning', li_lik: 'being a city-dweller',
+  },
+  'ölçü': {
+    base: 'measure',
+    li: 'moderate', siz: 'excessive',
+    li_lik: 'moderation', siz_lik: 'excess',
+    li_ca: 'moderately', siz_ca: 'excessively',
+  },
+  'din': {
+    base: 'religion',
+    ci: 'religious zealot', siz: 'irreligious', das: 'coreligionist', sal: 'religious (also dinî)',
+    ci_lik: 'religious zealotry', siz_lik: 'irreligiosity', das_lik: 'shared religion',
+  },
+  'para': {
+    base: 'money',
+    siz: 'penniless', li: 'wealthy', sal: 'monetary', cik: 'a little money',
+    siz_lik: 'poverty', li_lik: 'wealth', siz_ca: 'cheaply',
+  },
+  'hak': {
+    base: 'right',
+    ci: 'rights advocate', li: 'justified', siz: 'unjust', ca: 'justly',
+    ci_lik: 'advocacy for rights', li_lik: 'being right', siz_lik: 'injustice', siz_ca: 'unjustly',
+  },
+  'akıl': {
+    base: 'mind',
+    ci: 'rationalist', li: 'clever', siz: 'foolish', ca: 'wisely',
+    ci_lik: 'rationalism', li_lik: 'cleverness', siz_lik: 'foolishness', siz_ca: 'foolishly',
+  },
+  'hasta': {
+    base: 'sick',
+    lik: 'illness', hane: 'hospital',
+    lik_li: 'diseased', lik_siz: 'disease-free', lik_siz_lik: 'good health',
   },
   'şeker': {
     base: 'sugar',
@@ -489,6 +598,22 @@ function buildMeaning(root, templates) {
         dk = k; firstD = false;
         break;
       }
+      case '[hane]': {
+        const k = dk ? dk + '_hane' : 'hane';
+        if (md[k]) { en = md[k]; }
+        else { en = en + ' house'; }
+        person = false; adj = false; abstract = true;
+        dk = k; firstD = false;
+        break;
+      }
+      case '[DAr]': {
+        const k = dk ? dk + '_dar' : 'dar';
+        if (md[k]) { en = md[k]; }
+        else { en = en + ' veteran'; }
+        person = true; adj = false; abstract = false;
+        dk = k; firstD = false;
+        break;
+      }
       case 'kan': {
         en = md.kan || 'leader';
         person = true; adj = false; abstract = false;
@@ -530,24 +655,31 @@ function buildMeaning(root, templates) {
 // ── Root ordering (easiest to hardest) ───────────────
 const ROOT_ORDER = [
   'renk',   // 4
-  'vatan',  // 4
-  'çocuk',  // 4
+  'şehir',  // 5
   'iş',     // 5
   'kum',    // 5
   'süt',    // 5
   'çiçek',  // 5
   'şeker',  // 5
-  'ses',    // 6
-  'dil',    // 6
+  'çay',    // 5
+  'hasta',  // 5
+  'dil',    // 5
   'tuz',    // 6
-  'kitap',  // 6
+  'can',    // 6
+  'emek',   // 6
+  'ölçü',   // 6
+  'kitap',  // 7
   'güç',    // 7
-  'can',    // 7
   'ev',     // 7
   'su',     // 7
   'diş',    // 7
   'yol',    // 7
-  'baş',    // 8
+  'zaman',  // 7
+  'din',    // 7
+  'para',   // 7
+  'hak',    // 8
+  'akıl',   // 8
+  'baş',    // 9
   'arka',   // 9
   'söz',    // 12
   'göz',    // 13 — Final boss
@@ -558,7 +690,7 @@ let currentRoot = ROOT_ORDER[0];
 let chain = [];
 
 // ── Discovery tracking (persisted via localStorage) ──
-const STORAGE_KEY = 'suffixation_progress';
+const STORAGE_KEY = 'suffixation_progress_v2';
 const discovered = {};
 (function loadProgress() {
   for (const root of Object.keys(WORDS)) discovered[root] = new Set();
@@ -698,10 +830,12 @@ function resolve(template, currentWord) {
     case '[CI]':  return (vl ? 'ç' : 'c') + fourWay(lv);
     case '[lI]':  return 'l' + fourWay(lv);
     case '[CA]':  return (vl ? 'ç' : 'c') + twoWay(lv);
-    case '[DAş]': return (vl ? 't' : 'd') + twoWay(lv) + 'ş';
+    case '[DAş]': return (currentWord === 'dil' || currentWord === 'din') ? 'daş' : (vl ? 't' : 'd') + twoWay(lv) + 'ş';
     case '[CIK]': return (vl ? 'ç' : 'c') + fourWay(lv) + 'k';
     case '[msI]': return 'ms' + fourWay(lv);
     case '[sAl]': return 's' + twoWay(lv) + 'l';
+    case '[hane]': return 'hane';
+    case '[DAr]':  return (vl ? 't' : 'd') + 'ar';
     case '[DA]':  return (vl ? 't' : 'd') + twoWay(lv);
     case '[DAn]': return (vl ? 't' : 'd') + twoWay(lv) + 'n';
     case '[Al]':  return twoWay(lv) + 'l';
@@ -710,7 +844,7 @@ function resolve(template, currentWord) {
 }
 
 // ── Suffix grammar ───────────────────────────────────
-const YAPIM = new Set(['[CI]','[sIZ]','[lIK]','[lI]','[CA]','[DAş]','[CIK]','[msI]','[sAl]','kan','[DA]','[DAn]','[Al]']);
+const YAPIM = new Set(['[CI]','[sIZ]','[lIK]','[lI]','[CA]','[DAş]','[CIK]','[msI]','[sAl]','[hane]','[DAr]','kan','[DA]','[DAn]','[Al]']);
 
 // ── Per-root valid chains (whitelist of real Turkish words) ──
 const VC = {
@@ -789,20 +923,6 @@ const VC = {
     ['[sIZ]'],                             // renksiz
     ['[sIZ]','[lIK]'],                     // renksizlik
   ],
-  'ses': [
-    ['[lI]'],                              // sesli
-    ['[lI]','[lIK]'],                      // seslilik
-    ['[sIZ]'],                             // sessiz
-    ['[sIZ]','[lIK]'],                     // sessizlik
-    ['[sIZ]','[CA]'],                      // sessizce (silently)
-    ['[DAş]'],                             // sesteş (homophone)
-  ],
-  'vatan': [
-    ['[DAş]'],                             // vatandaş
-    ['[DAş]','[lIK]'],                     // vatandaşlık
-    ['[sIZ]'],                             // vatansız
-    ['[sIZ]','[lIK]'],                     // vatansızlık
-  ],
   'söz': [
     ['[CI]'],                              // sözcü
     ['[CI]','[lIK]'],                      // sözcülük
@@ -843,12 +963,6 @@ const VC = {
     ['[lIK]'],                             // kumluk
     ['[sAl]'],                             // kumsal
   ],
-  'çocuk': [
-    ['[lIK]'],                             // çocukluk
-    ['[CA]'],                              // çocukça
-    ['[sIZ]'],                             // çocuksuz
-    ['[sIZ]','[lIK]'],                     // çocuksuzluk
-  ],
   'dil': [
     ['[CI]'],                              // dilci
     ['[CI]','[lIK]'],                      // dilcilik
@@ -885,6 +999,91 @@ const VC = {
     ['[sIZ]'],                             // kitapsız
     ['[sIZ]','[lIK]'],                     // kitapsızlık
     ['[CIK]'],                             // kitapçık (booklet)
+    ['[hane]'],                            // kitaphane (library)
+  ],
+  'çay': [
+    ['[CI]'],                              // çaycı
+    ['[CI]','[lIK]'],                      // çaycılık
+    ['[sIZ]'],                             // çaysız
+    ['[lIK]'],                             // çaylık
+    ['[hane]'],                            // çayhane
+  ],
+  'emek': [
+    ['[CI]'],                              // emekçi
+    ['[CI]','[lIK]'],                      // emekçilik
+    ['[lI]'],                              // emekli
+    ['[lI]','[lIK]'],                      // emeklilik
+    ['[DAr]'],                             // emektar
+    ['[DAr]','[lIK]'],                     // emektarlık
+  ],
+  'zaman': [
+    ['[lI]'],                              // zamanlı
+    ['[sIZ]'],                             // zamansız
+    ['[sAl]'],                             // zamansal
+    ['[DAş]'],                             // zamandaş
+    ['[sIZ]','[lIK]'],                     // zamansızlık
+    ['[DAş]','[lIK]'],                     // zamandaşlık
+    ['[sIZ]','[CA]'],                      // zamansızca
+  ],
+  'şehir': [
+    ['[CI]'],                              // şehirci
+    ['[CI]','[lIK]'],                      // şehircilik
+    ['[lI]'],                              // şehirli
+    ['[lI]','[lIK]'],                      // şehirlilik
+    ['[sAl]'],                             // şehirsel
+  ],
+  'ölçü': [
+    ['[lI]'],                              // ölçülü
+    ['[sIZ]'],                             // ölçüsüz
+    ['[lI]','[lIK]'],                      // ölçülülük
+    ['[sIZ]','[lIK]'],                     // ölçüsüzlük
+    ['[lI]','[CA]'],                       // ölçülüce
+    ['[sIZ]','[CA]'],                      // ölçüsüzce
+  ],
+  'din': [
+    ['[CI]'],                              // dinci
+    ['[CI]','[lIK]'],                      // dincilik
+    ['[sIZ]'],                             // dinsiz
+    ['[sIZ]','[lIK]'],                     // dinsizlik
+    ['[DAş]'],                             // dindaş
+    ['[DAş]','[lIK]'],                     // dindaşlık
+    ['[sAl]'],                             // dinsel
+  ],
+  'para': [
+    ['[sIZ]'],                             // parasız
+    ['[lI]'],                              // paralı
+    ['[sAl]'],                             // parasal
+    ['[CIK]'],                             // paracık
+    ['[sIZ]','[lIK]'],                     // parasızlık
+    ['[lI]','[lIK]'],                      // paralılık
+    ['[sIZ]','[CA]'],                      // parasızca
+  ],
+  'hak': [
+    ['[CI]'],                              // hakçı
+    ['[lI]'],                              // haklı
+    ['[sIZ]'],                             // haksız
+    ['[CA]'],                              // hakça
+    ['[CI]','[lIK]'],                      // hakçılık
+    ['[lI]','[lIK]'],                      // haklılık
+    ['[sIZ]','[lIK]'],                     // haksızlık
+    ['[sIZ]','[CA]'],                      // haksızca
+  ],
+  'akıl': [
+    ['[CI]'],                              // akılcı
+    ['[lI]'],                              // akıllı
+    ['[sIZ]'],                             // akılsız
+    ['[CA]'],                              // akılca
+    ['[CI]','[lIK]'],                      // akılcılık
+    ['[lI]','[lIK]'],                      // akıllılık
+    ['[sIZ]','[lIK]'],                     // akılsızlık
+    ['[sIZ]','[CA]'],                      // akılsızca
+  ],
+  'hasta': [
+    ['[lIK]'],                             // hastalık
+    ['[hane]'],                            // hastahane
+    ['[lIK]','[lI]'],                      // hastalıklı
+    ['[lIK]','[sIZ]'],                     // hastalıksız
+    ['[lIK]','[sIZ]','[lIK]'],             // hastalıksızlık
   ],
   'şeker': [
     ['[CI]'],                              // şekerci
@@ -918,6 +1117,11 @@ function isValidNext(template) {
 }
 
 // ── Helpers ───────────────────────────────────────────
+// Override assembled word display for historical/irregular forms
+const WORD_OVERRIDES = {
+  'kitap:[hane]': 'kütüphane',
+};
+
 function getAssembled() {
   let word = currentRoot;
   const parts = [currentRoot];
@@ -926,6 +1130,8 @@ function getAssembled() {
     word += r;
     parts.push(r);
   }
+  const tmplKey = currentRoot + ':' + chain.map(i => WORDS[currentRoot].suffixes[i].template).join('+');
+  if (WORD_OVERRIDES[tmplKey]) word = WORD_OVERRIDES[tmplKey];
   return { word, key: parts.join('+') };
 }
 
@@ -936,8 +1142,25 @@ function el(tag, cls) {
 }
 
 // ── Render ────────────────────────────────────────────
+function renderTutorial() {
+  const box = document.getElementById('tutorial-box');
+  if (!box) return;
+  const isFirst = currentRoot === ROOT_ORDER[0];
+  const pristine = discovered[currentRoot] && discovered[currentRoot].size === 0;
+  if (isFirst && pristine) {
+    box.innerHTML =
+      '<div class="t-step"><div class="t-num">1</div><div>Click a suffix chip below to attach it to the root word.</div></div>' +
+      '<div class="t-step"><div class="t-num">2</div><div>If it makes a real Turkish word, it counts as a discovery!</div></div>' +
+      '<div class="t-step"><div class="t-num">3</div><div>Find <b>more than half</b> the hidden words to unlock the next level.</div></div>';
+    box.classList.add('visible');
+  } else {
+    box.classList.remove('visible');
+  }
+}
+
 function render() {
   trackDiscovery();
+  renderTutorial();
   renderSidebar();
   renderMeaning();
   renderChain();
@@ -995,6 +1218,10 @@ function renderSidebar() {
 
     cont.appendChild(item);
   });
+
+  // Scroll active pill into view on mobile
+  const activeItem = cont.querySelector('.sidebar-item.active');
+  if (activeItem) activeItem.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
 
   document.getElementById('global-progress-text').innerHTML =
     '<b>' + globalFound + '</b> / ' + globalTotal + ' total words';
